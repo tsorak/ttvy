@@ -21,8 +21,10 @@ async fn main() {
             None => continue,
         };
 
-        if let Some(command) = stdinput.split_once(' ') {
-            match command {
+        if let Some((cmd, args)) = input::parse_command(&stdinput) {
+            let arg1 = args[0];
+
+            match (cmd, arg1) {
                 (_cmd, "") => continue,
                 ("join", ch) | ("j", ch) => {
                     let _ = &supervisor_tx.send(("join", ch).try_into().unwrap()).await;
