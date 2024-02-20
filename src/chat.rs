@@ -1,9 +1,26 @@
-use fast_websocket_client as ws;
+use std::sync::Arc;
 
-pub async fn init(ttv_channel: &str) {
+use fast_websocket_client as ws;
+use tokio::sync::Mutex;
+
+#[derive(Debug)]
+pub struct Config {
+    pub newline_padding: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            newline_padding: true,
+        }
+    }
+}
+
+pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
     let join_string = format!("JOIN #{}", ttv_channel);
 
     let mut c = ws::connect("ws://irc-ws.chat.twitch.tv:80").await.unwrap();
+    c.set_auto_pong(true);
 
     c.send_string("PASS blah\n\r").await.unwrap();
     c.send_string("NICK justinfan354678\n\r").await.unwrap();
@@ -24,7 +41,14 @@ pub async fn init(ttv_channel: &str) {
                     .collect::<String>();
 
                 if let Some(user_message) = format_user_message(&msg) {
-                    println!("{}\r\n", user_message);
+                    let cfg = chat_config.lock().await;
+                    if cfg.newline_padding {
+                        drop(cfg);
+                        println!("{}\r\n", user_message);
+                    } else {
+                        drop(cfg);
+                        println!("{}", user_message);
+                    }
                 }
             }
             Err(_) => {

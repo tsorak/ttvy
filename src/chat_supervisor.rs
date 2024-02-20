@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use crate::chat;
 use tokio::{
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Mutex,
+    },
     task::{AbortHandle, JoinHandle},
 };
 
@@ -22,7 +27,10 @@ impl Channel {
         Self(tx, rx)
     }
 
-    pub fn init(mut rx: Receiver<Message>) -> JoinHandle<()> {
+    pub fn init(
+        mut rx: Receiver<Message>,
+        chat_config: Arc<Mutex<chat::Config>>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut chat_handle: Option<AbortHandle> = None;
 
@@ -34,9 +42,10 @@ impl Channel {
                             chat_handle.abort();
                         }
 
+                        let chat_config = chat_config.clone();
                         chat_handle = Some(
                             tokio::spawn(async move {
-                                chat::init(&channel_name).await;
+                                chat::init(&channel_name, chat_config).await;
                             })
                             .abort_handle(),
                         );
@@ -57,7 +66,7 @@ impl Channel {
     pub fn send(tx: &Sender<Message>, (cmd, arg1): (&str, &str)) {
         let tx = tx.clone();
 
-        if let Some(Message(cmd, arg1)) = (cmd, arg1).try_into().ok() {
+        if let Ok(Message(cmd, arg1)) = (cmd, arg1).try_into() {
             tokio::spawn(async move {
                 let _ = tx.send(Message(cmd, arg1)).await;
             });
