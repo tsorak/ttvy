@@ -5,9 +5,9 @@ mod input;
 mod log;
 
 use std::sync::Arc;
-
-use chat_supervisor as cs;
 use tokio::sync::Mutex;
+
+use chat_supervisor as sup;
 
 #[tokio::main]
 async fn main() {
@@ -15,16 +15,17 @@ async fn main() {
     conf.init();
 
     let stdin_channel = input::Channel::new(10);
-    let cs::Channel(sup_tx, sup_rx) = cs::Channel::new(10);
+    let sup::Channel(sup_tx, sup_rx) = sup::Channel::new(10);
+
     let chat_config = Arc::new(Mutex::new(chat::Config::default()));
 
     let handles = [
         stdin_channel.init(),
-        cs::Channel::init(sup_rx, chat_config.clone()),
+        sup::Channel::init(sup_rx, chat_config.clone()),
     ];
 
     if let Some(ch) = conf.initial_channel {
-        cs::Channel::send(&sup_tx, ("join", &ch));
+        sup::Channel::send(&sup_tx, ("join", &ch));
     } else {
         print_help();
     }
@@ -40,7 +41,7 @@ async fn main() {
 async fn command_loop(
     chat_config: Arc<Mutex<chat::Config>>,
     mut stdin_channel: input::Channel,
-    sup_tx: cs::CsSender,
+    sup_tx: sup::CsSender,
 ) {
     println!("Entering command read loop.");
 
@@ -55,7 +56,7 @@ async fn command_loop(
 
             match (cmd, arg1) {
                 (_cmd, "") => continue,
-                ("join", ch) | ("j", ch) => cs::Channel::send(&sup_tx, ("join", ch)),
+                ("join", ch) | ("j", ch) => sup::Channel::send(&sup_tx, ("join", ch)),
                 _ => continue,
             }
         } else {
@@ -64,7 +65,7 @@ async fn command_loop(
                     println!("Bye bye");
                     break;
                 }
-                "leave" | "ds" | "d" => cs::Channel::send(&sup_tx, ("leave", "")),
+                "leave" | "ds" | "d" => sup::Channel::send(&sup_tx, ("leave", "")),
                 //chat config
                 "pad" => {
                     let cfg = &mut chat_config.lock().await;
