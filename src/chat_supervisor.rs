@@ -29,23 +29,49 @@ impl Channel {
         Self(tx, rx)
     }
 
-    pub fn init(mut sup_rx: CsReceiver, chat_config: Arc<Mutex<chat::Config>>) -> JoinHandle<()> {
+    pub fn init(
+        (sup_tx, mut sup_rx): (CsSender, CsReceiver),
+        connect_options: chat::ConnectOptions,
+        chat_config: Arc<Mutex<chat::Config>>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut chat_handle: Option<AbortHandle> = None;
+            let mut restart_handle: Option<AbortHandle> = None;
+            let mut chat_tx: Option<Sender<String>> = None;
+
+            let connect_options = Arc::new(Mutex::new(connect_options));
 
             loop {
                 match sup_rx.recv().await {
                     None => (),
                     Some(Message(WsCommand::Join, channel_name)) => {
                         if let Some(chat_handle) = &chat_handle {
+                            restart_handle.as_ref().unwrap().abort();
                             chat_handle.abort();
                         }
 
-                        let child = supervise(channel_name, chat_config.clone());
-                        chat_handle = Some(child.abort_handle());
+                        {
+                            connect_options.lock().await.channel = channel_name.clone();
+                        }
+
+                        let (tx, handle) =
+                            connect_chat(connect_options.clone(), chat_config.clone());
+                        chat_tx = Some(tx);
+                        chat_handle = Some(handle.abort_handle());
+
+                        //hacky restart functionality
+                        let sup_tx = sup_tx.clone();
+                        restart_handle = Some(
+                            tokio::spawn(async move {
+                                let _ = handle.await;
+                                Channel::send(&sup_tx, ("join", &channel_name))
+                            })
+                            .abort_handle(),
+                        );
                     }
                     Some(Message(WsCommand::Leave, _)) => {
                         if let Some(chat_handle) = &chat_handle {
+                            restart_handle.as_ref().unwrap().abort();
                             chat_handle.abort();
                             println!("PoroSad ANYWAYS...")
                         } else {
@@ -80,19 +106,16 @@ impl TryFrom<(&str, &str)> for Message {
     }
 }
 
-fn supervise(channel_name: String, chat_config: Arc<Mutex<chat::Config>>) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        let mut first_loop = true;
-        loop {
-            if first_loop {
-                println!("Connecting to chat...");
-                first_loop = false;
-            } else {
-                println!("Reconnecting to chat...");
-            }
+fn connect_chat(
+    connect_options: Arc<Mutex<chat::ConnectOptions>>,
+    chat_config: Arc<Mutex<chat::Config>>,
+) -> (Sender<String>, JoinHandle<()>) {
+    let (tx, rx) = channel::<String>(10);
 
-            let chat_config = chat_config.clone();
-            chat::init(&channel_name, chat_config).await;
-        }
-    })
+    let handle = tokio::spawn(async move {
+        let chat_config = chat_config.clone();
+        chat::init(connect_options, chat_config, rx).await;
+    });
+
+    (tx, handle)
 }

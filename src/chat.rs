@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, ops::DerefMut, str::FromStr, sync::Arc};
 
 use colored::{ColoredString, Colorize, CustomColor};
 use fast_websocket_client as ws;
@@ -35,26 +35,33 @@ impl Config {
     }
 }
 
-pub struct ConnectOptions<'a> {
-    pub channel: &'a str,
-    pub nick: Option<&'a str>,
-    pub oauth: Option<&'a str>,
+pub struct ConnectOptions {
+    pub channel: String,
+    pub nick: Option<String>,
+    pub oauth: Option<String>,
 }
 
 pub async fn init(
-    connect_options: ConnectOptions<'_>,
+    connect_options: Arc<Mutex<ConnectOptions>>,
     chat_config: Arc<Mutex<Config>>,
     mut input_rx: Receiver<String>,
 ) {
+    let mut connect_options = connect_options.lock().await;
     let ConnectOptions {
         channel: ttv_channel,
         nick,
         oauth,
-    } = connect_options;
+    } = connect_options.deref_mut();
 
     let join = format!("JOIN #{}\n\r", ttv_channel);
-    let oauth = format!("PASS oauth:{}", oauth.unwrap_or("blah"));
-    let nick = format!("NICK {}\n\r", nick.unwrap_or("justinfan354678"));
+    let oauth = format!(
+        "PASS oauth:{}",
+        oauth.get_or_insert_with(|| "blah".to_string())
+    );
+    let nick = format!(
+        "NICK {}\n\r",
+        nick.get_or_insert_with(|| "justinfan354678".to_string())
+    );
 
     let mut conn = ws::connect("ws://irc-ws.chat.twitch.tv:80").await.unwrap();
     conn.set_auto_pong(true);

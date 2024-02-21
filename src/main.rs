@@ -19,9 +19,19 @@ async fn main() {
 
     let chat_config = Arc::new(Mutex::new(chat::Config::default()));
 
+    let connect_options = chat::ConnectOptions {
+        channel: "".to_string(),
+        nick: None,
+        oauth: None,
+    };
+
     let handles = [
         stdin_channel.init(),
-        sup::Channel::init(sup_rx, chat_config.clone()),
+        sup::Channel::init(
+            (sup_tx.clone(), sup_rx),
+            connect_options,
+            chat_config.clone(),
+        ),
     ];
 
     if let Some(ch) = conf.initial_channel {
