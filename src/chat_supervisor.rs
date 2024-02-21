@@ -10,7 +10,9 @@ use tokio::{
 };
 
 #[derive(Debug)]
-pub struct Channel(pub Sender<Message>, pub Receiver<Message>);
+pub struct Channel(pub CsSender, pub CsReceiver);
+pub type CsSender = Sender<Message>;
+type CsReceiver = Receiver<Message>;
 
 #[derive(Debug)]
 pub enum WsCommand {
@@ -27,15 +29,12 @@ impl Channel {
         Self(tx, rx)
     }
 
-    pub fn init(
-        mut rx: Receiver<Message>,
-        chat_config: Arc<Mutex<chat::Config>>,
-    ) -> JoinHandle<()> {
+    pub fn init(mut sup_rx: CsReceiver, chat_config: Arc<Mutex<chat::Config>>) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut chat_handle: Option<AbortHandle> = None;
 
             loop {
-                match rx.recv().await {
+                match sup_rx.recv().await {
                     None => (),
                     Some(Message(WsCommand::Join, channel_name)) => {
                         if let Some(chat_handle) = &chat_handle {

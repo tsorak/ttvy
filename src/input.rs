@@ -17,7 +17,7 @@ impl Channel {
         self.1.recv().await.map(|s| s.trim().to_owned())
     }
 
-    pub fn init_stdin_read_loop(&self) -> JoinHandle<()> {
+    pub fn init(&self) -> JoinHandle<()> {
         let tx = self.0.clone();
 
         tokio::spawn(async move {

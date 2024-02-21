@@ -1,5 +1,6 @@
 mod chat;
 mod chat_supervisor;
+mod config;
 mod input;
 mod log;
 
@@ -10,25 +11,41 @@ use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() {
-    let mut input = input::Channel::new(10);
+    let mut conf = config::Config::new();
+    conf.init();
+
+    let stdin_channel = input::Channel::new(10);
     let cs::Channel(sup_tx, sup_rx) = cs::Channel::new(10);
     let chat_config = Arc::new(Mutex::new(chat::Config::default()));
 
-    input.init_stdin_read_loop();
-    cs::Channel::init(sup_rx, chat_config.clone());
+    let handles = [
+        stdin_channel.init(),
+        cs::Channel::init(sup_rx, chat_config.clone()),
+    ];
 
-    println!(
-        "\
-        Entering command read loop.\n\
-        \n\
-        Commands:\n\
-        join(j) [CHANNEL]: join the specified Twitch chatroom\n\
-        leave(d,ds): leave the current chatroom\n\
-        pad: print an empty newline between each message\n\
-        "
-    );
+    if let Some(ch) = conf.initial_channel {
+        cs::Channel::send(&sup_tx, ("join", &ch));
+    } else {
+        print_help();
+    }
+
+    command_loop(chat_config, stdin_channel, sup_tx).await;
+
+    for handle in handles {
+        handle.abort();
+    }
+    std::process::exit(0)
+}
+
+async fn command_loop(
+    chat_config: Arc<Mutex<chat::Config>>,
+    mut stdin_channel: input::Channel,
+    sup_tx: cs::CsSender,
+) {
+    println!("Entering command read loop.");
+
     loop {
-        let stdinput = match input.recieve().await {
+        let stdinput = match stdin_channel.recieve().await {
             Some(s) => s,
             None => continue,
         };
@@ -43,7 +60,10 @@ async fn main() {
             }
         } else {
             match stdinput.as_str() {
-                "q" => println!("Bye bye"),
+                "q" => {
+                    println!("Bye bye");
+                    break;
+                }
                 "leave" | "ds" | "d" => cs::Channel::send(&sup_tx, ("leave", "")),
                 "pad" => {
                     let cfg = &mut chat_config.lock().await;
@@ -56,10 +76,26 @@ async fn main() {
                     log::chat::color_status(cfg.color_sender);
                 }
                 "c" => clear(),
+                "h" => print_help(),
                 _ => continue,
             }
         }
     }
+}
+
+fn print_help() {
+    println!(
+        "\
+        [MAIN]\n\
+        join(j) [CHANNEL]: join the specified Twitch chatroom\n\
+        leave(d,ds): leave the current chatroom\n\n\
+        [CHAT SETTINGS]\n\
+        pad: print an empty newline between each message\n\
+        color: color usernames\n\n\
+        [MISC]\n\
+        help(h): print this clump of text\n\
+        "
+    );
 }
 
 fn clear() {
