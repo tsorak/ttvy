@@ -38,19 +38,19 @@ impl Config {
 pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
     let join_string = format!("JOIN #{}", ttv_channel);
 
-    let mut c = ws::connect("ws://irc-ws.chat.twitch.tv:80").await.unwrap();
-    c.set_auto_pong(true);
+    let mut conn = ws::connect("ws://irc-ws.chat.twitch.tv:80").await.unwrap();
+    conn.set_auto_pong(true);
 
-    c.send_string("PASS blah\n\r").await.unwrap();
-    c.send_string("NICK justinfan354678\n\r").await.unwrap();
-    c.send_string(&join_string).await.unwrap();
-    c.send_string("CAP REQ :twitch.tv/tags").await.unwrap();
+    conn.send_string("PASS blah\n\r").await.unwrap();
+    conn.send_string("NICK justinfan354678\n\r").await.unwrap();
+    conn.send_string(&join_string).await.unwrap();
+    conn.send_string("CAP REQ :twitch.tv/tags").await.unwrap();
 
     let mut read_tags_allowed = false;
 
     println!("Joined channel #{}", ttv_channel);
     loop {
-        match c.receive_frame().await {
+        match conn.receive_frame().await {
             Ok(f) => {
                 let msg = if let Ok(s) = std::str::from_utf8(&f.payload) {
                     s.to_string()
