@@ -10,6 +10,7 @@ use crate::log;
 pub struct Config {
     pub newline_padding: bool,
     pub color_sender: bool,
+    pub debug: bool,
 }
 
 impl Default for Config {
@@ -17,7 +18,20 @@ impl Default for Config {
         Self {
             newline_padding: false,
             color_sender: true,
+            debug: false,
         }
+    }
+}
+
+impl Config {
+    async fn debug_enabled(chat_config: &Arc<Mutex<Config>>) -> bool {
+        let c = chat_config.lock().await;
+        c.debug
+    }
+
+    async fn color_enabled(chat_config: &Arc<Mutex<Config>>) -> bool {
+        let c = chat_config.lock().await;
+        c.color_sender
     }
 }
 
@@ -63,13 +77,14 @@ pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
                             print_user_message(&chat_config, user_message).await;
                         }
                     }
-                    m => {
+                    m if Config::debug_enabled(&chat_config).await => {
                         log::warn(&m);
                     }
+                    _ => (),
                 }
             }
             Err(e) => {
-                dbg!("Error receiving frame", e);
+                println!("{}", e);
                 break;
             }
         }
@@ -135,7 +150,7 @@ async fn format_user_message_with_tags(
     let sender_nick = tags.get("display-name").copied();
 
     if let (Some(sender), msg) = (sender_nick, message) {
-        if color_enabled(chat_config).await {
+        if Config::color_enabled(chat_config).await {
             let sender = colorise_sender(sender, &tags);
             Some(format!("{}: {}", sender, msg))
         } else {
@@ -163,9 +178,4 @@ fn colorise_sender(sender: &str, tags: &HashMap<&str, &str>) -> ColoredString {
     } else {
         sender.bold()
     }
-}
-
-async fn color_enabled(chat_config: &Arc<Mutex<Config>>) -> bool {
-    let c = chat_config.lock().await;
-    c.color_sender
 }

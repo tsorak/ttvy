@@ -65,6 +65,7 @@ async fn command_loop(
                     break;
                 }
                 "leave" | "ds" | "d" => cs::Channel::send(&sup_tx, ("leave", "")),
+                //chat config
                 "pad" => {
                     let cfg = &mut chat_config.lock().await;
                     cfg.newline_padding = !cfg.newline_padding;
@@ -75,8 +76,14 @@ async fn command_loop(
                     cfg.color_sender = !cfg.color_sender;
                     log::chat::color_status(cfg.color_sender);
                 }
+                "debug" => {
+                    let cfg = &mut chat_config.lock().await;
+                    cfg.debug = !cfg.debug;
+                    log::chat::debug_status(cfg.debug);
+                }
+                //misc
                 "c" => clear(),
-                "h" => print_help(),
+                "h" | "help" => print_help(),
                 _ => continue,
             }
         }
@@ -87,13 +94,16 @@ fn print_help() {
     println!(
         "\
         [MAIN]\n\
-        join(j) [CHANNEL]: join the specified Twitch chatroom\n\
-        leave(d,ds): leave the current chatroom\n\n\
+        join(j) [CHANNEL]: Join the specified Twitch chatroom\n\
+        leave(d,ds): Leave the current chatroom\n\n\
         [CHAT SETTINGS]\n\
-        pad: print an empty newline between each message\n\
-        color: color usernames\n\n\
+        color: Color usernames\n\
+        pad: Print an empty newline between each message\n\
+        debug: Print various junk that Twitch sends\n\n\
         [MISC]\n\
-        help(h): print this clump of text\n\
+        q: Quit the application\n\
+        c: Clear the screen\n\
+        help(h): Print this clump of text\n\
         "
     );
 }

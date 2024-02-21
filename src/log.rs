@@ -22,4 +22,12 @@ pub(crate) mod chat {
             println!("[{}] Newline padding", "OFF".red());
         }
     }
+
+    pub fn debug_status(b: bool) {
+        if b {
+            println!("[{}] Chat debug", "ON".green());
+        } else {
+            println!("[{}] Chat debug", "OFF".red());
+        }
+    }
 }
