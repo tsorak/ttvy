@@ -49,10 +49,13 @@ pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
                         drop(cfg);
                         println!("{}", user_message);
                     }
+                } else {
+                    dbg!("[UNKNOWN MESSAGE]", &msg);
                 }
             }
-            Err(_) => {
-                continue;
+            Err(e) => {
+                dbg!("Error receiving frame", e);
+                break;
             }
         }
     }

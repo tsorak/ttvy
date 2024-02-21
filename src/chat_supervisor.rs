@@ -43,12 +43,22 @@ impl Channel {
                         }
 
                         let chat_config = chat_config.clone();
-                        chat_handle = Some(
-                            tokio::spawn(async move {
+
+                        let child = tokio::spawn(async move {
+                            let mut first_loop = true;
+                            loop {
+                                if first_loop {
+                                    println!("Connecting to chat...");
+                                    first_loop = false;
+                                } else {
+                                    println!("Reconnecting to chat...");
+                                }
+                                let chat_config = chat_config.clone();
                                 chat::init(&channel_name, chat_config).await;
-                            })
-                            .abort_handle(),
-                        );
+                            }
+                        });
+
+                        chat_handle = Some(child.abort_handle());
                     }
                     Some(Message(WsCommand::Leave, _)) => {
                         if let Some(chat_handle) = &chat_handle {

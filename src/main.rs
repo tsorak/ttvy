@@ -48,8 +48,13 @@ async fn main() {
                     let cfg = &mut chat_config.lock().await;
                     cfg.newline_padding = !cfg.newline_padding;
                 }
+                "c" => clear(),
                 _ => continue,
             }
         }
     }
+}
+
+fn clear() {
+    println!("{esc}c", esc = 27 as char);
 }
