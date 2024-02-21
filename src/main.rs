@@ -49,6 +49,10 @@ async fn main() {
                     let cfg = &mut chat_config.lock().await;
                     cfg.newline_padding = !cfg.newline_padding;
                 }
+                "color" => {
+                    let cfg = &mut chat_config.lock().await;
+                    cfg.color_sender = !cfg.color_sender;
+                }
                 "c" => clear(),
                 _ => continue,
             }

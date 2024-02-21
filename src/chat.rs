@@ -6,9 +6,19 @@ use tokio::sync::Mutex;
 
 use crate::log;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
     pub newline_padding: bool,
+    pub color_sender: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            newline_padding: false,
+            color_sender: true,
+        }
+    }
 }
 
 pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
@@ -28,22 +38,23 @@ pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
     loop {
         match c.receive_frame().await {
             Ok(f) => {
-                let msg = f
-                    .payload
-                    .iter()
-                    .map(|b| {
-                        let b = *b;
-                        let c: char = b.into();
-                        c
-                    })
-                    .collect::<String>();
+                let msg = if let Ok(s) = std::str::from_utf8(&f.payload) {
+                    s.to_string()
+                } else {
+                    f.payload
+                        .iter()
+                        .map(|v| -> char { (*v).into() })
+                        .collect::<String>()
+                };
 
                 match msg {
                     m if m.contains("ACK :twitch.tv/tags") => {
                         read_tags_allowed = true;
                     }
                     m if read_tags_allowed && m.contains("PRIVMSG") => {
-                        if let Some(user_message) = format_user_message_with_tags(&m) {
+                        if let Some(user_message) =
+                            format_user_message_with_tags(&chat_config, &m).await
+                        {
                             print_user_message(&chat_config, user_message).await;
                         }
                     }
@@ -97,7 +108,10 @@ fn format_user_message(str: &str) -> Option<String> {
     }
 }
 
-fn format_user_message_with_tags(str: &str) -> Option<String> {
+async fn format_user_message_with_tags(
+    chat_config: &Arc<Mutex<Config>>,
+    str: &str,
+) -> Option<String> {
     let str = str.split_once("\r\n").unwrap().0;
     if !str.contains("PRIVMSG") {
         return None;
@@ -121,9 +135,12 @@ fn format_user_message_with_tags(str: &str) -> Option<String> {
     let sender_nick = tags.get("display-name").copied();
 
     if let (Some(sender), msg) = (sender_nick, message) {
-        let sender = colorise_sender(sender, &tags);
-
-        Some(format!("{}: {}", sender, msg))
+        if color_enabled(chat_config).await {
+            let sender = colorise_sender(sender, &tags);
+            Some(format!("{}: {}", sender, msg))
+        } else {
+            Some(format!("{}: {}", sender.bold(), msg))
+        }
     } else {
         None
     }
@@ -146,4 +163,9 @@ fn colorise_sender(sender: &str, tags: &HashMap<&str, &str>) -> ColoredString {
     } else {
         sender.bold()
     }
+}
+
+async fn color_enabled(chat_config: &Arc<Mutex<Config>>) -> bool {
+    let c = chat_config.lock().await;
+    c.color_sender
 }
