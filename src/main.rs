@@ -1,6 +1,7 @@
 mod chat;
 mod chat_supervisor;
 mod input;
+mod log;
 
 use std::sync::Arc;
 
