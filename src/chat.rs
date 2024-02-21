@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use colored::{ColoredString, Colorize, CustomColor};
 use fast_websocket_client as ws;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc::Receiver, Mutex};
 
 use crate::log;
 
@@ -35,59 +35,91 @@ impl Config {
     }
 }
 
-pub async fn init(ttv_channel: &str, chat_config: Arc<Mutex<Config>>) {
-    let join_string = format!("JOIN #{}", ttv_channel);
+pub struct ConnectOptions<'a> {
+    pub channel: &'a str,
+    pub nick: Option<&'a str>,
+    pub oauth: Option<&'a str>,
+}
+
+pub async fn init(
+    connect_options: ConnectOptions<'_>,
+    chat_config: Arc<Mutex<Config>>,
+    mut input_rx: Receiver<String>,
+) {
+    let ConnectOptions {
+        channel: ttv_channel,
+        nick,
+        oauth,
+    } = connect_options;
+
+    let join = format!("JOIN #{}\n\r", ttv_channel);
+    let oauth = format!("PASS oauth:{}", oauth.unwrap_or("blah"));
+    let nick = format!("NICK {}\n\r", nick.unwrap_or("justinfan354678"));
 
     let mut conn = ws::connect("ws://irc-ws.chat.twitch.tv:80").await.unwrap();
     conn.set_auto_pong(true);
 
-    conn.send_string("PASS blah\n\r").await.unwrap();
-    conn.send_string("NICK justinfan354678\n\r").await.unwrap();
-    conn.send_string(&join_string).await.unwrap();
+    conn.send_string(&oauth).await.unwrap();
+    conn.send_string(&nick).await.unwrap();
+    conn.send_string(&join).await.unwrap();
     conn.send_string("CAP REQ :twitch.tv/tags").await.unwrap();
 
     let mut read_tags_allowed = false;
-
     println!("Joined channel #{}", ttv_channel);
     loop {
-        match conn.receive_frame().await {
-            Ok(f) => {
-                let msg = if let Ok(s) = std::str::from_utf8(&f.payload) {
-                    s.to_string()
-                } else {
-                    f.payload
-                        .iter()
-                        .map(|v| -> char { (*v).into() })
-                        .collect::<String>()
-                };
-
-                match msg {
-                    m if m.contains("ACK :twitch.tv/tags") => {
-                        read_tags_allowed = true;
+        tokio::select! {
+            res = conn.receive_frame() => {
+                match res {
+                    Ok(f) => {
+                        let msg = if let Ok(s) = std::str::from_utf8(&f.payload) {
+                            s.to_string()
+                        } else {
+                            f.payload
+                                .iter()
+                                .map(|v| -> char { (*v).into() })
+                                .collect::<String>()
+                        };
+                        handle_websocket_message(msg, &mut read_tags_allowed, &chat_config).await;
                     }
-                    m if read_tags_allowed && m.contains("PRIVMSG") => {
-                        if let Some(user_message) =
-                            format_user_message_with_tags(&chat_config, &m).await
-                        {
-                            print_user_message(&chat_config, user_message).await;
-                        }
+                    Err(e) => {
+                        println!("{}", e);
+                        break;
                     }
-                    m if m.contains("PRIVMSG") => {
-                        if let Some(user_message) = format_user_message(&m) {
-                            print_user_message(&chat_config, user_message).await;
-                        }
-                    }
-                    m if Config::debug_enabled(&chat_config).await => {
-                        log::warn(&m);
-                    }
-                    _ => (),
                 }
             }
-            Err(e) => {
-                println!("{}", e);
-                break;
+            msg = input_rx.recv() => {
+                if let Some(msg) = msg {
+                    let fmt = format!("PRIVMSG #{} :{}", ttv_channel, msg);
+                    conn.send_string(&fmt).await.unwrap();
+                }
+            }
+        };
+    }
+}
+
+async fn handle_websocket_message(
+    msg: String,
+    read_tags_allowed: &mut bool,
+    chat_config: &Arc<Mutex<Config>>,
+) {
+    match msg {
+        m if m.contains("ACK :twitch.tv/tags") => {
+            *read_tags_allowed = true;
+        }
+        m if *read_tags_allowed && m.contains("PRIVMSG") => {
+            if let Some(user_message) = format_user_message_with_tags(chat_config, &m).await {
+                print_user_message(chat_config, user_message).await;
             }
         }
+        m if m.contains("PRIVMSG") => {
+            if let Some(user_message) = format_user_message(&m) {
+                print_user_message(chat_config, user_message).await;
+            }
+        }
+        m if Config::debug_enabled(chat_config).await => {
+            log::warn(&m);
+        }
+        _ => (),
     }
 }
 
