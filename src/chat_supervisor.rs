@@ -16,8 +16,9 @@ type CsReceiver = Receiver<Message>;
 
 #[derive(Debug)]
 pub enum WsCommand {
-    Join = 0,
-    Leave = 1,
+    Message = 0,
+    Join = 1,
+    Leave = 2,
 }
 
 #[derive(Debug)]
@@ -78,6 +79,11 @@ impl Channel {
                             println!("You aren't even in a channel LuL!")
                         }
                     }
+                    Some(Message(WsCommand::Message, message)) => {
+                        if let Some(tx) = &chat_tx {
+                            let _ = tx.send(message).await;
+                        }
+                    }
                 }
             }
         })
@@ -101,6 +107,7 @@ impl TryFrom<(&str, &str)> for Message {
         match value {
             ("join", channel_name) => Ok(Self(WsCommand::Join, channel_name.to_owned())),
             ("leave", _) => Ok(Self(WsCommand::Leave, String::new())),
+            ("m", message) => Ok(Self(WsCommand::Message, message.to_owned())),
             _ => Err(()),
         }
     }

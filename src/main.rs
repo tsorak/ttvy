@@ -12,7 +12,7 @@ use chat_supervisor as sup;
 #[tokio::main]
 async fn main() {
     let mut conf = config::Config::new();
-    conf.init();
+    conf.init().await;
 
     let stdin_channel = input::Channel::new(10);
     let sup::Channel(sup_tx, sup_rx) = sup::Channel::new(10);
@@ -21,8 +21,8 @@ async fn main() {
 
     let connect_options = chat::ConnectOptions {
         channel: "".to_string(),
-        nick: None,
-        oauth: None,
+        nick: conf.ttv_nick,
+        oauth: conf.ttv_token,
     };
 
     let handles = [
@@ -95,7 +95,7 @@ async fn command_loop(
                 //misc
                 "c" => clear(),
                 "h" | "help" => print_help(),
-                _ => continue,
+                msg => sup::Channel::send(&sup_tx, ("m", msg)),
             }
         }
     }

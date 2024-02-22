@@ -35,6 +35,7 @@ impl Config {
     }
 }
 
+#[derive(Debug)]
 pub struct ConnectOptions {
     pub channel: String,
     pub nick: Option<String>,
@@ -96,8 +97,8 @@ pub async fn init(
             }
             msg = input_rx.recv() => {
                 if let Some(msg) = msg {
-                    let fmt = format!("PRIVMSG #{} :{}", ttv_channel, msg);
-                    conn.send_string(&fmt).await.unwrap();
+                    let fmt = format!("PRIVMSG #{} :{}", ttv_channel, &msg);
+                    let _ = conn.send_string(&fmt).await;
                 }
             }
         };
