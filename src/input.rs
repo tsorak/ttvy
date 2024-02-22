@@ -32,15 +32,15 @@ impl Channel {
 }
 
 type Cmd<'a> = &'a str;
-type Args<'a> = Vec<&'a str>;
+type Args<'a> = &'a str;
 
 pub(crate) fn parse_command(s: &str) -> Option<(Cmd, Args)> {
     let mut words = s.split(' ').collect::<Vec<&str>>();
 
     match words {
-        ref mut w if w.len() >= 2 => {
+        ref mut w if w.len() == 2 => {
             let cmd = w.remove(0);
-            Some((cmd, words))
+            Some((cmd, words[0]))
         }
         _ => None,
     }

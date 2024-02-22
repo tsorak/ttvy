@@ -61,13 +61,12 @@ async fn command_loop(
             None => continue,
         };
 
-        if let Some((cmd, args)) = input::parse_command(&stdinput) {
-            let arg1 = args[0];
-
+        if let Some((cmd, arg1)) = input::parse_command(&stdinput) {
             match (cmd, arg1) {
                 (_cmd, "") => continue,
                 ("join", ch) | ("j", ch) => sup::Channel::send(&sup_tx, ("join", ch)),
-                _ => continue,
+                ("nick", name) => sup::Channel::send(&sup_tx, ("nick", name)),
+                _ => send_message(&sup_tx, &stdinput),
             }
         } else {
             match stdinput.as_str() {
@@ -95,7 +94,7 @@ async fn command_loop(
                 //misc
                 "c" => clear(),
                 "h" | "help" => print_help(),
-                msg => sup::Channel::send(&sup_tx, ("m", msg)),
+                msg => send_message(&sup_tx, msg),
             }
         }
     }
@@ -106,7 +105,8 @@ fn print_help() {
         "\
         [MAIN]\n\
         join(j) [CHANNEL]: Join the specified Twitch chatroom\n\
-        leave(d,ds): Leave the current chatroom\n\n\
+        leave(d,ds): Leave the current chatroom\n\
+        nick [NAME]: set nickname (This needs to be the name of the channel you authenticated as. lowercase most likely)\n\n\
         [CHAT SETTINGS]\n\
         color: Color usernames\n\
         pad: Print an empty newline between each message\n\
@@ -117,6 +117,10 @@ fn print_help() {
         help(h): Print this clump of text\n\
         "
     );
+}
+
+fn send_message(sup_tx: &sup::CsSender, msg: &str) {
+    sup::Channel::send(sup_tx, ("m", msg));
 }
 
 fn clear() {

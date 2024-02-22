@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::DerefMut, str::FromStr, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use colored::{ColoredString, Colorize, CustomColor};
 use fast_websocket_client as ws;
@@ -47,22 +47,22 @@ pub async fn init(
     chat_config: Arc<Mutex<Config>>,
     mut input_rx: Receiver<String>,
 ) {
-    let mut connect_options = connect_options.lock().await;
-    let ConnectOptions {
-        channel: ttv_channel,
-        nick,
-        oauth,
-    } = connect_options.deref_mut();
+    let mut state = connect_options.lock().await;
+    let ttv_channel = state.channel.clone();
 
     let join = format!("JOIN #{}\n\r", ttv_channel);
     let oauth = format!(
         "PASS oauth:{}",
-        oauth.get_or_insert_with(|| "blah".to_string())
+        state.oauth.get_or_insert_with(|| "blah".to_string())
     );
     let nick = format!(
         "NICK {}\n\r",
-        nick.get_or_insert_with(|| "justinfan354678".to_string())
+        state
+            .nick
+            .get_or_insert_with(|| "justinfan354678".to_string())
     );
+
+    drop(state);
 
     let mut conn = ws::connect("ws://irc-ws.chat.twitch.tv:80").await.unwrap();
     conn.set_auto_pong(true);
@@ -73,6 +73,7 @@ pub async fn init(
     conn.send_string("CAP REQ :twitch.tv/tags").await.unwrap();
 
     let mut read_tags_allowed = false;
+    let mut last_sent_message = String::new();
     println!("Joined channel #{}", ttv_channel);
     loop {
         tokio::select! {
@@ -96,7 +97,14 @@ pub async fn init(
                 }
             }
             msg = input_rx.recv() => {
-                if let Some(msg) = msg {
+                if let Some(mut msg) = msg {
+
+                    if last_sent_message == msg {
+                        msg.push('\u{E0000}');
+                    }
+
+                    last_sent_message = msg.clone();
+
                     let fmt = format!("PRIVMSG #{} :{}", ttv_channel, &msg);
                     let _ = conn.send_string(&fmt).await;
                 }
