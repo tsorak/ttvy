@@ -9,38 +9,30 @@ use tokio::sync::Mutex;
 
 use chat_supervisor as sup;
 
+use crate::config::Config;
+
 #[tokio::main]
 async fn main() {
-    let mut conf = config::Config::new().await;
-    conf.init().await;
+    let conf = Arc::new(Mutex::new(Config::new().await));
+    Config::set_initial_channel(&conf).await;
 
     let stdin_channel = input::Channel::new(10);
     let sup::Channel(sup_tx, sup_rx) = sup::Channel::new(10);
 
     let chat_config = Arc::new(Mutex::new(chat::Config::default()));
 
-    let connect_options = chat::ConnectOptions {
-        channel: "".to_string(),
-        nick: conf.ttv_nick,
-        oauth: conf.ttv_token,
-    };
-
     let handles = [
         stdin_channel.init(),
-        sup::Channel::init(
-            (sup_tx.clone(), sup_rx),
-            connect_options,
-            chat_config.clone(),
-        ),
+        sup::Channel::init((sup_tx.clone(), sup_rx), &conf, chat_config.clone()),
     ];
 
-    if let Some(ch) = conf.initial_channel {
-        sup::Channel::send(&sup_tx, ("join", &ch));
+    if let Some(ch) = &conf.lock().await.channel {
+        sup::Channel::send(&sup_tx, ("join", ch));
     } else {
         print_help();
     }
 
-    command_loop(chat_config, stdin_channel, sup_tx).await;
+    command_loop(conf, chat_config, stdin_channel, sup_tx).await;
 
     for handle in handles {
         handle.abort();
@@ -49,6 +41,7 @@ async fn main() {
 }
 
 async fn command_loop(
+    conf: Arc<Mutex<config::Config>>,
     chat_config: Arc<Mutex<chat::Config>>,
     mut stdin_channel: input::Channel,
     sup_tx: sup::CsSender,
@@ -70,10 +63,7 @@ async fn command_loop(
             }
         } else {
             match stdinput.as_str() {
-                "q" => {
-                    println!("Bye bye");
-                    break;
-                }
+                "auth" => Config::fetch_auth_token(&conf),
                 "leave" | "ds" | "d" => sup::Channel::send(&sup_tx, ("leave", "")),
                 //chat config
                 "pad" => {
@@ -92,6 +82,10 @@ async fn command_loop(
                     log::chat::debug_status(cfg.debug);
                 }
                 //misc
+                "q" => {
+                    println!("Bye bye");
+                    break;
+                }
                 "c" => clear(),
                 "h" | "help" => print_help(),
                 msg => send_message(&sup_tx, msg),
@@ -106,7 +100,8 @@ fn print_help() {
         [MAIN]\n\
         join(j) [CHANNEL]: Join the specified Twitch chatroom\n\
         leave(d,ds): Leave the current chatroom\n\
-        nick [NAME]: set nickname (This needs to be the name of the channel you authenticated as. lowercase most likely)\n\n\
+        auth: (Re)authenticate with twitch (required in order to send messages)\n\
+        nick [NAME]: set nickname (This needs to be the name of the channel you authenticated as)\n\n\
         [CHAT SETTINGS]\n\
         color: Color usernames\n\
         pad: Print an empty newline between each message\n\

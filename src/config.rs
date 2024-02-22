@@ -1,13 +1,13 @@
-use std::{env, path::PathBuf, str::FromStr};
+use std::{env, path::PathBuf, str::FromStr, sync::Arc};
 
 use serde::{Deserialize, Serialize};
-use tokio::fs;
+use tokio::{fs, sync::Mutex};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Config {
-    pub initial_channel: Option<String>,
-    pub ttv_token: Option<String>,
-    pub ttv_nick: Option<String>,
+pub(crate) struct Config {
+    pub channel: Option<String>,
+    pub oauth: Option<String>,
+    pub nick: Option<String>,
 }
 
 impl Config {
@@ -19,9 +19,9 @@ impl Config {
         match fs::read_to_string(&save_dir).await {
             Ok(c) => serde_json::from_str(&c).expect("Bad config"),
             Err(_) => Self {
-                initial_channel: None,
-                ttv_token: None,
-                ttv_nick: None,
+                channel: None,
+                oauth: None,
+                nick: None,
             },
         }
     }
@@ -29,11 +29,31 @@ impl Config {
     pub async fn init(&mut self) -> &mut Self {
         let args: Vec<String> = env::args().collect();
 
-        self.initial_channel = args.get(1).cloned();
-        self.ttv_token = Some(http::get_ttv_token().await);
+        if let Some(channel) = args.get(1).cloned() {
+            self.channel = Some(channel);
+        }
+        self.oauth.get_or_insert(http::get_ttv_token().await);
         // self.ttv_nick = None;
 
         self
+    }
+
+    pub async fn set_initial_channel(config: &Arc<Mutex<Self>>) {
+        let config = config.clone();
+        let args: Vec<String> = env::args().collect();
+
+        if let Some(initial_channel) = args.get(1) {
+            let mut c = config.lock().await;
+            let _ = c.channel.insert(initial_channel.clone());
+        }
+    }
+
+    pub fn fetch_auth_token(config: &Arc<Mutex<Self>>) {
+        let config = config.clone();
+        tokio::spawn(async move {
+            let mut c = config.lock().await;
+            let _ = c.oauth.insert(http::get_ttv_token().await);
+        });
     }
 }
 

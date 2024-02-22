@@ -4,7 +4,7 @@ use colored::{ColoredString, Colorize, CustomColor};
 use fast_websocket_client as ws;
 use tokio::sync::{mpsc::Receiver, Mutex};
 
-use crate::log;
+use crate::{config, log};
 
 #[derive(Debug)]
 pub struct Config {
@@ -35,20 +35,13 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
-pub struct ConnectOptions {
-    pub channel: String,
-    pub nick: Option<String>,
-    pub oauth: Option<String>,
-}
-
 pub async fn init(
-    connect_options: Arc<Mutex<ConnectOptions>>,
+    connect_options: Arc<Mutex<config::Config>>,
     chat_config: Arc<Mutex<Config>>,
     mut input_rx: Receiver<String>,
 ) {
     let mut state = connect_options.lock().await;
-    let ttv_channel = state.channel.clone();
+    let ttv_channel = state.channel.clone().unwrap();
 
     let join = format!("JOIN #{}\n\r", ttv_channel);
     let oauth = format!(

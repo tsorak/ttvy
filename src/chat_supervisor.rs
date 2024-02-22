@@ -33,15 +33,14 @@ impl Channel {
 
     pub fn init(
         (sup_tx, mut sup_rx): (CsSender, CsReceiver),
-        connect_options: chat::ConnectOptions,
+        connect_options: &Arc<Mutex<crate::config::Config>>,
         chat_config: Arc<Mutex<chat::Config>>,
     ) -> JoinHandle<()> {
+        let connect_options = connect_options.clone();
         tokio::spawn(async move {
             let mut chat_handle: Option<AbortHandle> = None;
             let mut restart_handle: Option<AbortHandle> = None;
             let mut chat_tx: Option<Sender<String>> = None;
-
-            let connect_options = Arc::new(Mutex::new(connect_options));
 
             loop {
                 match sup_rx.recv().await {
@@ -53,7 +52,11 @@ impl Channel {
                         }
 
                         {
-                            connect_options.lock().await.channel = channel_name.clone();
+                            let _ = connect_options
+                                .lock()
+                                .await
+                                .channel
+                                .insert(channel_name.clone());
                         }
 
                         let (tx, handle) =
@@ -121,7 +124,7 @@ impl TryFrom<(&str, &str)> for Message {
 }
 
 fn connect_chat(
-    connect_options: Arc<Mutex<chat::ConnectOptions>>,
+    connect_options: Arc<Mutex<crate::config::Config>>,
     chat_config: Arc<Mutex<chat::Config>>,
 ) -> (Sender<String>, JoinHandle<()>) {
     let (tx, rx) = channel::<String>(10);
