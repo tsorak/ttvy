@@ -11,7 +11,7 @@ use chat_supervisor as sup;
 
 #[tokio::main]
 async fn main() {
-    let mut conf = config::Config::new();
+    let mut conf = config::Config::new().await;
     conf.init().await;
 
     let stdin_channel = input::Channel::new(10);

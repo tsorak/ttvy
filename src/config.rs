@@ -1,5 +1,9 @@
-use std::env;
+use std::{env, path::PathBuf, str::FromStr};
 
+use serde::{Deserialize, Serialize};
+use tokio::fs;
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub initial_channel: Option<String>,
     pub ttv_token: Option<String>,
@@ -7,11 +11,18 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Self {
-        Self {
-            initial_channel: None,
-            ttv_token: None,
-            ttv_nick: None,
+    pub async fn new() -> Self {
+        let mut save_dir = env::var("HOME").expect("Failed to get HOME");
+        save_dir.push_str("/.ttvy/state.json");
+        let save_dir = PathBuf::from_str(&save_dir).unwrap();
+
+        match fs::read_to_string(&save_dir).await {
+            Ok(c) => serde_json::from_str(&c).expect("Bad config"),
+            Err(_) => Self {
+                initial_channel: None,
+                ttv_token: None,
+                ttv_nick: None,
+            },
         }
     }
 
