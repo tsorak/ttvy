@@ -26,18 +26,6 @@ impl Config {
         }
     }
 
-    pub async fn init(&mut self) -> &mut Self {
-        let args: Vec<String> = env::args().collect();
-
-        if let Some(channel) = args.get(1).cloned() {
-            self.channel = Some(channel);
-        }
-        self.oauth.get_or_insert(http::get_ttv_token().await);
-        // self.ttv_nick = None;
-
-        self
-    }
-
     pub async fn set_initial_channel(config: &Arc<Mutex<Self>>) {
         let config = config.clone();
         let args: Vec<String> = env::args().collect();

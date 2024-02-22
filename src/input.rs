@@ -1,6 +1,5 @@
-use std::io::stdin;
-
 use tokio::{
+    io::{stdin, AsyncBufReadExt, BufReader},
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinHandle,
 };
@@ -9,7 +8,7 @@ pub struct Channel(pub Sender<String>, pub Receiver<String>);
 
 impl Channel {
     pub fn new(bfr: usize) -> Self {
-        let (tx, rx) = channel(bfr);
+        let (tx, rx) = channel::<String>(bfr);
         Self(tx, rx)
     }
 
@@ -17,17 +16,27 @@ impl Channel {
         self.1.recv().await.map(|s| s.trim().to_owned())
     }
 
-    pub fn init(&self) -> JoinHandle<()> {
+    pub fn init(&self) -> (JoinHandle<()>, Sender<()>) {
         let tx = self.0.clone();
 
-        tokio::spawn(async move {
-            loop {
-                let mut buf: String = "".to_owned();
-                stdin().read_line(&mut buf).unwrap();
+        let (shutdown_tx, mut shutdown_rx) = channel::<()>(1);
 
-                let _ = tx.send(buf).await;
+        let handle = tokio::spawn(async move {
+            let stdin = stdin();
+            let mut stdin = BufReader::new(stdin).lines();
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        break;
+                    }
+                    Ok(Some(line)) = stdin.next_line() => {
+                        let _ = tx.send(line).await;
+                    }
+                }
             }
-        })
+        });
+
+        (handle, shutdown_tx)
     }
 }
 
@@ -43,16 +52,5 @@ pub(crate) fn parse_command(s: &str) -> Option<(Cmd, Args)> {
             Some((cmd, words[0]))
         }
         _ => None,
-    }
-}
-
-pub(crate) mod keypress {
-    use tokio::io::{self, AsyncBufReadExt};
-
-    pub async fn enter() {
-        let mut reader = io::BufReader::new(io::stdin());
-        let mut buf = String::new();
-
-        reader.read_line(&mut buf).await.unwrap();
     }
 }

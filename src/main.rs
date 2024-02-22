@@ -21,10 +21,8 @@ async fn main() {
 
     let chat_config = Arc::new(Mutex::new(chat::Config::default()));
 
-    let handles = [
-        stdin_channel.init(),
-        sup::Channel::init((sup_tx.clone(), sup_rx), &conf, chat_config.clone()),
-    ];
+    let (stdin_handle, stdin_close_tx) = stdin_channel.init();
+    let sup_handle = sup::Channel::init((sup_tx.clone(), sup_rx), &conf, chat_config.clone());
 
     if let Some(ch) = &conf.lock().await.channel {
         sup::Channel::send(&sup_tx, ("join", ch));
@@ -34,10 +32,11 @@ async fn main() {
 
     command_loop(conf, chat_config, stdin_channel, sup_tx).await;
 
-    for handle in handles {
-        handle.abort();
-    }
-    std::process::exit(0)
+    sup_handle.abort();
+    stdin_close_tx.send(()).await.unwrap();
+    stdin_handle.abort();
+    //stdin stuck reading the final line...
+    std::process::exit(0);
 }
 
 async fn command_loop(
