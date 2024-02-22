@@ -98,9 +98,16 @@ pub async fn init(
             }
             msg = input_rx.recv() => {
                 if let Some(mut msg) = msg {
+                    if msg.is_empty() {
+                        msg = last_sent_message.clone();
+                    }
 
                     if last_sent_message == msg {
-                        msg.push('\u{E0000}');
+                        if msg.contains(" \u{E0000}") {
+                            msg = msg.strip_suffix(" \u{E0000}").unwrap().to_string();
+                        } else {
+                            msg.push_str(" \u{E0000}");
+                        }
                     }
 
                     last_sent_message = msg.clone();

@@ -60,7 +60,7 @@ mod http {
             .to_string();
 
         if Command::new("open").arg(&api_url).spawn().is_err() {
-            println!("Complete authentication at '{api_url}'");
+            println!("Complete authentication at\n{api_url}");
         }
 
         println!("Waiting for token...");
@@ -69,13 +69,9 @@ mod http {
 
         let _handle = start_webserver(token_tx, shutdown_rx);
 
-        //loop until we receive the token
-        loop {
-            if let Some(msg) = token_rx.recv().await {
-                shutdown_tx.send(()).await.unwrap();
-                return msg;
-            }
-        }
+        let msg = token_rx.recv().await.unwrap();
+        shutdown_tx.send(()).await.unwrap();
+        msg
     }
 
     fn start_webserver(token_tx: Sender<String>, mut shutdown_rx: Receiver<()>) -> JoinHandle<()> {

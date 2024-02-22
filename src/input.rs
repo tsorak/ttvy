@@ -45,3 +45,14 @@ pub(crate) fn parse_command(s: &str) -> Option<(Cmd, Args)> {
         _ => None,
     }
 }
+
+pub(crate) mod keypress {
+    use tokio::io::{self, AsyncBufReadExt};
+
+    pub async fn enter() {
+        let mut reader = io::BufReader::new(io::stdin());
+        let mut buf = String::new();
+
+        reader.read_line(&mut buf).await.unwrap();
+    }
+}
