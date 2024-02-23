@@ -57,7 +57,7 @@ async fn command_loop(
             match (cmd, arg1) {
                 (_cmd, "") => continue,
                 ("join", ch) | ("j", ch) => sup::Channel::send(&sup_tx, ("join", ch)),
-                ("nick", name) => sup::Channel::send(&sup_tx, ("nick", name)),
+                ("nick", name) => set_nick(&conf, name),
                 _ => send_message(&sup_tx, &stdinput),
             }
         } else {
@@ -120,16 +120,19 @@ fn send_message(sup_tx: &sup::CsSender, msg: &str) {
 }
 
 async fn reconnect(sup_tx: &sup::CsSender, conf: &Arc<Mutex<config::Config>>) {
-    let conf = conf.clone();
-    let conf = conf.lock().await;
-    let ch = conf.channel.clone();
-    drop(conf);
-
-    if let Some(ch) = ch {
+    let prev_channel = Config::get(conf, |c| &c.channel).await;
+    if let Some(ch) = prev_channel {
         sup::Channel::send(sup_tx, ("join", &ch));
     } else {
         println!("No recently joined channel to reconnect to");
     }
+}
+
+fn set_nick(conf: &Arc<Mutex<config::Config>>, name: &str) {
+    let name = name.to_string();
+    Config::update(conf, move |c| {
+        let _ = c.nick.insert(name.clone());
+    })
 }
 
 fn clear() {

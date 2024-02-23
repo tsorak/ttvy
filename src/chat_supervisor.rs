@@ -19,7 +19,6 @@ pub enum WsCommand {
     Message,
     Join,
     Leave,
-    Nick,
 }
 
 #[derive(Debug)]
@@ -88,11 +87,6 @@ impl Channel {
                             let _ = tx.send(message).await;
                         }
                     }
-                    Some(Message(WsCommand::Nick, name)) => {
-                        let mut c = connect_options.lock().await;
-                        println!("Nick set to: {}", &name);
-                        c.nick = Some(name);
-                    }
                 }
             }
         })
@@ -117,7 +111,6 @@ impl TryFrom<(&str, &str)> for Message {
             ("join", channel_name) => Ok(Self(WsCommand::Join, channel_name.to_owned())),
             ("leave", _) => Ok(Self(WsCommand::Leave, String::new())),
             ("m", message) => Ok(Self(WsCommand::Message, message.to_owned())),
-            ("nick", name) => Ok(Self(WsCommand::Nick, name.to_owned())),
             _ => Err(()),
         }
     }

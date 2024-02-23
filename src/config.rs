@@ -3,9 +3,10 @@ use std::{env, path::PathBuf, str::FromStr, sync::Arc};
 use serde::{Deserialize, Serialize};
 use tokio::{fs, sync::Mutex};
 
-#[derive(Serialize, Deserialize, Debug)]
+type TTVChannel = String;
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct Config {
-    pub channel: Option<String>,
+    pub channel: Option<TTVChannel>,
     pub oauth: Option<String>,
     pub nick: Option<String>,
 }
@@ -44,6 +45,27 @@ impl Config {
             let _ = c.oauth.insert(token);
             drop(c);
             println!("Authtoken has been set!");
+        });
+    }
+
+    pub async fn get<T, V>(config: &Arc<Mutex<Self>>, accessor: T) -> V
+    where
+        T: Fn(&Config) -> &V,
+        V: std::clone::Clone,
+    {
+        let config = config.clone();
+        let c = config.lock().await;
+        accessor(&c).clone()
+    }
+
+    pub fn update<T>(config: &Arc<Mutex<Self>>, setter: T)
+    where
+        T: Fn(&mut Config) + std::marker::Send + 'static,
+    {
+        let config = config.clone();
+        tokio::spawn(async move {
+            let mut c = config.lock().await;
+            setter(&mut c);
         });
     }
 }
