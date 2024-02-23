@@ -39,14 +39,17 @@ impl Config {
     pub fn fetch_auth_token(config: &Arc<Mutex<Self>>) {
         let config = config.clone();
         tokio::spawn(async move {
+            let token = http::get_ttv_token().await;
             let mut c = config.lock().await;
-            let _ = c.oauth.insert(http::get_ttv_token().await);
+            let _ = c.oauth.insert(token);
+            drop(c);
+            println!("Authtoken has been set!");
         });
     }
 }
 
 mod http {
-    use std::sync::Arc;
+    use std::{process::Stdio, sync::Arc};
 
     use axum::{
         http::{header, HeaderValue},
@@ -78,8 +81,9 @@ mod http {
             &redirect_uri=http://localhost:4537"
             .to_string();
 
-        if Command::new("open").arg(&api_url).spawn().is_err() {
-            println!("Complete authentication at\n{api_url}");
+        println!("Complete authentication at\n{}", &api_url);
+        if open_browser(&api_url).await.is_err() {
+            println!("Failed to open browser automatically, please navigate manually.")
         }
 
         println!("Waiting for token...");
@@ -91,6 +95,16 @@ mod http {
         let msg = token_rx.recv().await.unwrap();
         shutdown_tx.send(()).await.unwrap();
         msg
+    }
+
+    async fn open_browser(url: &str) -> Result<std::process::ExitStatus, std::io::Error> {
+        Command::new("open")
+            .arg(url)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .await
     }
 
     fn start_webserver(token_tx: Sender<String>, mut shutdown_rx: Receiver<()>) -> JoinHandle<()> {
