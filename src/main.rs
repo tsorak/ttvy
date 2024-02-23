@@ -64,6 +64,7 @@ async fn command_loop(
             match stdinput.as_str() {
                 "auth" => Config::fetch_auth_token(&conf),
                 "leave" | "ds" | "d" => sup::Channel::send(&sup_tx, ("leave", "")),
+                "r" => reconnect(&sup_tx, &conf).await,
                 //chat config
                 "pad" => {
                     let cfg = &mut chat_config.lock().await;
@@ -100,7 +101,8 @@ fn print_help() {
         join(j) [CHANNEL]: Join the specified Twitch chatroom\n\
         leave(d,ds): Leave the current chatroom\n\
         auth: (Re)authenticate with twitch (required in order to send messages)\n\
-        nick [NAME]: set nickname (This needs to be the name of the channel you authenticated as)\n\n\
+        nick [NAME]: Set nickname (This needs to be the name of the channel you authenticated as)\n\
+        r: Reconnect to the last channel\n\n\
         [CHAT SETTINGS]\n\
         color: Color usernames\n\
         pad: Print an empty newline between each message\n\
@@ -115,6 +117,19 @@ fn print_help() {
 
 fn send_message(sup_tx: &sup::CsSender, msg: &str) {
     sup::Channel::send(sup_tx, ("m", msg));
+}
+
+async fn reconnect(sup_tx: &sup::CsSender, conf: &Arc<Mutex<config::Config>>) {
+    let conf = conf.clone();
+    let conf = conf.lock().await;
+    let ch = conf.channel.clone();
+    drop(conf);
+
+    if let Some(ch) = ch {
+        sup::Channel::send(sup_tx, ("join", &ch));
+    } else {
+        println!("No recently joined channel to reconnect to");
+    }
 }
 
 fn clear() {
