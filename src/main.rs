@@ -65,6 +65,8 @@ async fn command_loop(
                 "auth" => Config::fetch_auth_token(&conf),
                 "leave" | "ds" | "d" => sup::Channel::send(&sup_tx, ("leave", "")),
                 "r" => reconnect(&sup_tx, &conf).await,
+                "save" => save(&conf),
+                "nick" => print_nick(&conf),
                 //chat config
                 "pad" => {
                     let cfg = &mut chat_config.lock().await;
@@ -133,6 +135,20 @@ fn set_nick(conf: &Arc<Mutex<config::Config>>, name: &str) {
     Config::update(conf, move |c| {
         let _ = c.nick.insert(name.clone());
     })
+}
+
+fn print_nick(conf: &Arc<Mutex<config::Config>>) {
+    Config::cast(conf, |c| {
+        println!("{}", c.nick.as_deref().unwrap_or(""));
+    });
+}
+
+fn save(conf: &Arc<Mutex<config::Config>>) {
+    let conf = conf.clone();
+    tokio::spawn(async move {
+        Config::save(&conf).await;
+        println!("Wrote config.");
+    });
 }
 
 fn clear() {

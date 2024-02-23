@@ -9,13 +9,18 @@ pub(crate) struct Config {
     pub channel: Option<TTVChannel>,
     pub oauth: Option<String>,
     pub nick: Option<String>,
+    pub bookmarks: Vec<TTVChannel>,
 }
 
 impl Config {
-    pub async fn new() -> Self {
+    fn get_save_dir() -> PathBuf {
         let mut save_dir = env::var("HOME").expect("Failed to get HOME");
         save_dir.push_str("/.ttvy/state.json");
-        let save_dir = PathBuf::from_str(&save_dir).unwrap();
+        PathBuf::from_str(&save_dir).unwrap()
+    }
+
+    pub async fn new() -> Self {
+        let save_dir = Self::get_save_dir();
 
         match fs::read_to_string(&save_dir).await {
             Ok(c) => serde_json::from_str(&c).expect("Bad config"),
@@ -23,6 +28,7 @@ impl Config {
                 channel: None,
                 oauth: None,
                 nick: None,
+                bookmarks: vec![],
             },
         }
     }
@@ -67,6 +73,26 @@ impl Config {
             let mut c = config.lock().await;
             setter(&mut c);
         });
+    }
+
+    pub fn cast<T>(config: &Arc<Mutex<Self>>, accessor: T)
+    where
+        T: Fn(&Config) + std::marker::Send + 'static,
+    {
+        let config = config.clone();
+        tokio::spawn(async move {
+            let c = config.lock().await;
+            accessor(&c);
+        });
+    }
+
+    pub async fn save(config: &Arc<Mutex<Self>>) {
+        let lock = config.lock().await;
+        let data = serde_json::json!(*lock).to_string();
+
+        let save_dir = Self::get_save_dir();
+        let _ = tokio::fs::create_dir_all(save_dir.parent().unwrap()).await;
+        let _ = tokio::fs::write(&save_dir, data).await;
     }
 }
 
