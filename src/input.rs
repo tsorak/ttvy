@@ -12,7 +12,7 @@ impl Channel {
         Self(tx, rx)
     }
 
-    pub async fn recieve(&mut self) -> Option<String> {
+    pub async fn receive(&mut self) -> Option<String> {
         self.1.recv().await.map(|s| s.trim().to_owned())
     }
 
@@ -25,13 +25,8 @@ impl Channel {
             let stdin = stdin();
             let mut stdin = BufReader::new(stdin).lines();
             loop {
-                tokio::select! {
-                    _ = shutdown_rx.recv() => {
-                        break;
-                    }
-                    Ok(Some(line)) = stdin.next_line() => {
-                        let _ = tx.send(line).await;
-                    }
+                if let Ok(Some(line)) = stdin.next_line().await {
+                    let _ = tx.send(line).await;
                 }
             }
         });
