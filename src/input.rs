@@ -1,51 +1,65 @@
+mod command;
+mod user_input;
+
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
 };
 
-pub struct Channel(pub Sender<String>, pub Receiver<String>);
+pub use self::command::{CommandMessage, CommandType};
+use self::{command::Command, user_input::UserInput};
 
-impl Channel {
-    pub fn new(bfr: usize) -> Self {
-        let (tx, rx) = channel::<String>(bfr);
-        Self(tx, rx)
+pub struct Input {
+    command: Command,
+    user_input: UserInput,
+}
+
+impl Input {
+    pub fn new() -> Self {
+        let mut user_input = UserInput::new(10);
+        user_input.init();
+
+        Self {
+            command: Command::new(),
+            user_input,
+        }
     }
 
-    pub async fn receive(&mut self) -> Option<String> {
-        self.1.recv().await.map(|s| s.trim().to_owned())
-    }
+    pub fn init(&mut self) -> (JoinHandle<()>, Receiver<String>, Receiver<CommandMessage>) {
+        let user_input_rx = self.user_input.rx.take().expect("Only call init once");
+        let command_rx = self.command.rx.take().expect("Only call init once");
 
-    pub fn init(&self) -> (JoinHandle<()>, Sender<()>) {
-        let tx = self.0.clone();
+        let user_input_tx = self.user_input.tx.clone();
+        let command_tx = self.command.tx.clone();
 
-        let (shutdown_tx, mut shutdown_rx) = channel::<()>(1);
-
-        let handle = tokio::spawn(async move {
+        let h = tokio::spawn(async move {
             let stdin = stdin();
             let mut stdin = BufReader::new(stdin).lines();
             loop {
                 if let Ok(Some(line)) = stdin.next_line().await {
-                    let _ = tx.send(line).await;
+                    Self::process_line(line, &user_input_tx, &command_tx).await;
                 }
             }
         });
 
-        (handle, shutdown_tx)
+        (h, user_input_rx, command_rx)
     }
-}
 
-type Cmd<'a> = &'a str;
-type Args<'a> = &'a str;
+    async fn process_line(
+        line: String,
+        user_input_tx: &Sender<String>,
+        command_tx: &Sender<CommandMessage>,
+    ) {
+        let line = line.trim();
 
-pub(crate) fn parse_command(s: &str) -> Option<(Cmd, Args)> {
-    let mut words = s.split(' ').collect::<Vec<&str>>();
-
-    match words {
-        ref mut w if w.len() == 2 => {
-            let cmd = w.remove(0);
-            Some((cmd, words[0]))
+        if line.starts_with('!') {
+            let line = line.strip_prefix('!').unwrap();
+            if let Some(command) = Command::parse(line) {
+                let _ = command_tx.send(command).await;
+            }
+        } else {
+            let _ = user_input_tx.send(line.to_string()).await;
         }
-        _ => None,
     }
 }
