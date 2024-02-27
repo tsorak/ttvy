@@ -4,13 +4,14 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 pub enum CommandType {
     FetchAuth,
     SetAuth,
-    SetChannel,
+    Join,
     Leave,
     SetNick,
     Save,
     ShowConfig,
     Reconnect,
 }
+use self::CommandType as C;
 
 pub type CommandMessage = (CommandType, String);
 
@@ -26,18 +27,28 @@ impl Command {
     }
 
     pub fn parse(line: &str) -> Option<CommandMessage> {
-        match line.splitn(2, ' ').collect::<Vec<&str>>()[..] {
-            ["auth"] => Some((CommandType::FetchAuth, String::new())),
-            ["auth", token] => Some((CommandType::SetAuth, token.to_string())),
-            ["join", ch] | ["j", ch] if !ch.is_empty() => {
-                Some((CommandType::SetChannel, ch.to_lowercase()))
+        let (cmd, arg) = {
+            match line.splitn(2, ' ').collect::<Vec<&str>>()[..] {
+                [cmd] => (cmd, None),
+                [cmd, arg] if !arg.trim().is_empty() => (cmd, Some(arg.to_string())),
+                _ => ("", None),
             }
-            ["leave"] | ["d"] => Some((CommandType::Leave, String::new())),
-            ["nick", name] if !name.is_empty() => Some((CommandType::SetNick, name.to_lowercase())),
-            ["save"] => Some((CommandType::Save, String::new())),
-            ["show", "config"] => Some((CommandType::ShowConfig, String::new())),
-            ["reconnect"] | ["r"] => Some((CommandType::Reconnect, String::new())),
+        };
+
+        match (cmd, arg) {
+            ("auth", None) => Some((C::FetchAuth, empty_arg())),
+            ("auth", Some(token)) => Some((C::SetAuth, token)),
+            ("join" | "j", Some(ch)) => Some((C::Join, ch.to_lowercase())),
+            ("leave" | "d", None) => Some((C::Leave, empty_arg())),
+            ("nick", Some(nick)) => Some((C::SetNick, nick.to_lowercase())),
+            ("save" | "s", None) => Some((C::Save, empty_arg())),
+            ("show", Some(arg)) if arg == "config" => Some((C::ShowConfig, empty_arg())),
+            ("reconnect" | "r", None) => Some((C::Reconnect, empty_arg())),
             _ => None,
         }
     }
+}
+
+fn empty_arg() -> String {
+    String::new()
 }

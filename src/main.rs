@@ -37,7 +37,7 @@ async fn handle_command(cmd: CommandMessage, chat: &mut Chat) {
         (CommandType::SetNick, nick) => {
             chat.config.nick.replace(nick);
         }
-        (CommandType::SetChannel, channel) => chat.join(&channel),
+        (CommandType::Join, channel) => chat.join(&channel),
         (CommandType::Leave, _) => chat.leave().await,
         (CommandType::Save, _) => chat.config.save().await,
         (CommandType::ShowConfig, _) => println!("{:#?}", chat.config),
