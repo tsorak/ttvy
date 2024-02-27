@@ -214,16 +214,3 @@ fn parse_tags(tags: &str) -> HashMap<&str, &str> {
         .filter_map(|pair| pair.split_once('='))
         .collect()
 }
-
-fn colorise_sender(sender: &str, tags: &HashMap<&str, &str>) -> ColoredString {
-    if let Some(hexcolor) = tags.get("color") {
-        match hex_color::HexColor::from_str(hexcolor) {
-            Ok(hex_color::HexColor { r, g, b, .. }) => {
-                sender.custom_color(CustomColor { r, g, b }).bold()
-            }
-            Err(_) => sender.bold(),
-        }
-    } else {
-        sender.bold()
-    }
-}

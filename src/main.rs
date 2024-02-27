@@ -1,7 +1,10 @@
-use input::{CommandMessage, CommandType, Input};
 use ttvy_core::chat::Chat;
 
 mod input;
+use input::{CommandMessage, CommandType, Input};
+
+mod output;
+use output::print_chat_message;
 
 #[tokio::main]
 async fn main() {
@@ -14,19 +17,22 @@ async fn main() {
     loop {
         tokio::select! {
             msg = chat.receive() => {
-                println!("{}: {}", msg.author, msg.message);
+                print_chat_message(msg);
             }
             Some(msg) = user_input_rx.recv() => {
                 let _ = chat.send(msg).await;
             }
             Some(cmd) = command_rx.recv() => {
-                handle_command(cmd, &mut chat).await;
+                let exit = handle_command(cmd, &mut chat).await;
+                if exit {
+                    break;
+                }
             }
         }
     }
 }
 
-async fn handle_command(cmd: CommandMessage, chat: &mut Chat) {
+async fn handle_command(cmd: CommandMessage, chat: &mut Chat) -> bool {
     match cmd {
         (CommandType::FetchAuth, _) => {
             chat.fetch_auth_token().await;
@@ -42,5 +48,7 @@ async fn handle_command(cmd: CommandMessage, chat: &mut Chat) {
         (CommandType::Save, _) => chat.config.save().await,
         (CommandType::ShowConfig, _) => println!("{:#?}", chat.config),
         (CommandType::Reconnect, _) => chat.reconnect(),
-    }
+        (CommandType::Exit, _) => return true,
+    };
+    false
 }

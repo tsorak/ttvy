@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 ttvy_core = { git = "https://github.com/tsorak/ttvy_core.git" }
 tokio = { version = "^1.36.0", features = ["full"] }
+hex_color = "^3.0.0"
+colored = "^2.1.0"

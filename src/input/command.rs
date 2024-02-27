@@ -10,6 +10,7 @@ pub enum CommandType {
     Save,
     ShowConfig,
     Reconnect,
+    Exit,
 }
 use self::CommandType as C;
 
@@ -44,6 +45,7 @@ impl Command {
             ("save" | "s", None) => Some((C::Save, empty_arg())),
             ("show", Some(arg)) if arg == "config" => Some((C::ShowConfig, empty_arg())),
             ("reconnect" | "r", None) => Some((C::Reconnect, empty_arg())),
+            ("q", None) => Some((C::Exit, empty_arg())),
             _ => None,
         }
     }
