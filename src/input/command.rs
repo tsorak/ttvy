@@ -11,6 +11,7 @@ pub enum CommandType {
     ShowConfig,
     Reconnect,
     Exit,
+    Echo,
 }
 use self::CommandType as C;
 
@@ -31,6 +32,7 @@ impl Command {
         let (cmd, arg) = {
             match line.splitn(2, ' ').collect::<Vec<&str>>()[..] {
                 [cmd] => (cmd, None),
+                ["echo", s] => ("echo", Some(s.to_string())),
                 [cmd, arg] if !arg.trim().is_empty() => (cmd, Some(arg.to_string())),
                 _ => ("", None),
             }
@@ -46,6 +48,7 @@ impl Command {
             ("show", Some(arg)) if arg == "config" => Some((C::ShowConfig, empty_arg())),
             ("reconnect" | "r", None) => Some((C::Reconnect, empty_arg())),
             ("q", None) => Some((C::Exit, empty_arg())),
+            ("echo", Some(s)) => Some((C::Echo, s)),
             _ => None,
         }
     }

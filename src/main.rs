@@ -49,6 +49,9 @@ async fn handle_command(cmd: CommandMessage, chat: &mut Chat) -> bool {
         (CommandType::ShowConfig, _) => println!("{:#?}", chat.config),
         (CommandType::Reconnect, _) => chat.reconnect(),
         (CommandType::Exit, _) => return true,
+        (CommandType::Echo, s) => {
+            dbg!(s);
+        }
     };
     false
 }

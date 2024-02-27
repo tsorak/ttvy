@@ -5,6 +5,8 @@ use tokio::{
     task::JoinHandle,
 };
 
+const UP_ARROW: &str = "\u{1b}[A";
+
 pub struct UserInput {
     pub(super) tx: Sender<String>,
     bottleneck_rx: Option<Receiver<String>>,
@@ -38,12 +40,20 @@ impl UserInput {
             let mut timeout = anti_spam_timeout(0);
 
             loop {
-                match rx.recv().await {
-                    Some(msg) if timeout.is_finished() => {
+                let msg = if let Some(msg) = rx.recv().await {
+                    let fmt = msg.trim_matches(' ').to_string();
+                    let fmt = prepend_last_message(fmt, &last_message);
+                    fmt
+                } else {
+                    continue;
+                };
+
+                match msg {
+                    msg if timeout.is_finished() => {
                         let _ = tx.send(msg.if_empty_do(&mut last_message)).await;
                         timeout = anti_spam_timeout(500);
                     }
-                    Some(msg) if !msg.is_empty() => {
+                    msg if !msg.is_empty() => {
                         //Incoming message before timeout has passed.
                         //
                         //Set this msg as last_message to prevent it from dissapearing
@@ -78,5 +88,16 @@ impl IfEmptyDo for String {
             *fallback = self.clone();
             self.clone()
         }
+    }
+}
+
+fn prepend_last_message(s: String, last_msg: &String) -> String {
+    if !s.starts_with(UP_ARROW) {
+        return s;
+    }
+
+    match s.splitn(2, UP_ARROW).collect::<Vec<_>>()[..] {
+        ["", addition] => format!("{last_msg} {addition}"),
+        _ => s,
     }
 }
