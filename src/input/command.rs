@@ -13,6 +13,7 @@ pub enum CommandType {
     Exit,
     Echo,
     Clear,
+    Help,
 }
 use self::CommandType as C;
 
@@ -51,6 +52,7 @@ impl Command {
             ("q", None) => Some((C::Exit, empty_arg())),
             ("echo", Some(s)) => Some((C::Echo, s)),
             ("clear" | "c", None) => Some((C::Clear, empty_arg())),
+            ("help" | "h", None) => Some((C::Help, empty_arg())),
             _ => None,
         }
     }
