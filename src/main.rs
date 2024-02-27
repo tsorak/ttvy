@@ -30,6 +30,10 @@ async fn main() {
             }
         }
     }
+
+    println!("Goodbye");
+    //stdin receiver freezes, todo!
+    std::process::exit(0);
 }
 
 async fn handle_command(cmd: CommandMessage, chat: &mut Chat) -> bool {
@@ -52,6 +56,11 @@ async fn handle_command(cmd: CommandMessage, chat: &mut Chat) -> bool {
         (CommandType::Echo, s) => {
             dbg!(s);
         }
+        (CommandType::Clear, _) => clear(),
     };
     false
+}
+
+fn clear() {
+    println!("\x1B[2J\x1B[1;1H");
 }

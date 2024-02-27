@@ -12,6 +12,7 @@ pub enum CommandType {
     Reconnect,
     Exit,
     Echo,
+    Clear,
 }
 use self::CommandType as C;
 
@@ -49,6 +50,7 @@ impl Command {
             ("reconnect" | "r", None) => Some((C::Reconnect, empty_arg())),
             ("q", None) => Some((C::Exit, empty_arg())),
             ("echo", Some(s)) => Some((C::Echo, s)),
+            ("clear" | "c", None) => Some((C::Clear, empty_arg())),
             _ => None,
         }
     }

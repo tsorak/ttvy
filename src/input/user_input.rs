@@ -42,8 +42,7 @@ impl UserInput {
             loop {
                 let msg = if let Some(msg) = rx.recv().await {
                     let fmt = msg.trim_matches(' ').to_string();
-                    let fmt = prepend_last_message(fmt, &last_message);
-                    fmt
+                    prepend_last_message(fmt, &last_message)
                 } else {
                     continue;
                 };
@@ -51,7 +50,7 @@ impl UserInput {
                 match msg {
                     msg if timeout.is_finished() => {
                         let _ = tx.send(msg.if_empty_do(&mut last_message)).await;
-                        timeout = anti_spam_timeout(500);
+                        timeout = anti_spam_timeout(1000);
                     }
                     msg if !msg.is_empty() => {
                         //Incoming message before timeout has passed.
