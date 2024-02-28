@@ -1,4 +1,8 @@
+#![allow(dead_code)]
+
 use ttvy_core::chat::Chat;
+
+mod ct;
 
 mod input;
 use input::{CommandMessage, CommandType, Input};
@@ -8,6 +12,11 @@ use output::{print_chat_message, StyleConfig};
 
 #[tokio::main]
 async fn main() {
+    ct::main().await;
+    std::process::exit(0);
+}
+
+async fn main2() {
     let mut chat = Chat::new();
     chat.init().await;
 
