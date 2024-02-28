@@ -14,6 +14,8 @@ pub enum CommandType {
     Echo,
     Clear,
     Help,
+    Color,
+    Pad,
 }
 use self::CommandType as C;
 
@@ -53,6 +55,8 @@ impl Command {
             ("echo", Some(s)) => Some((C::Echo, s)),
             ("clear" | "c", None) => Some((C::Clear, empty_arg())),
             ("help" | "h", None) => Some((C::Help, empty_arg())),
+            ("color", None) => Some((C::Color, empty_arg())),
+            ("pad", None) => Some((C::Pad, empty_arg())),
             _ => None,
         }
     }

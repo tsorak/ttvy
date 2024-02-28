@@ -4,7 +4,7 @@ mod input;
 use input::{CommandMessage, CommandType, Input};
 
 mod output;
-use output::print_chat_message;
+use output::{print_chat_message, StyleConfig};
 
 #[tokio::main]
 async fn main() {
@@ -14,17 +14,19 @@ async fn main() {
     let mut input = Input::new();
     let (_handle, mut user_input_rx, mut command_rx) = input.init();
 
+    let mut style_config = StyleConfig::new();
+
     println!("Type !help for help");
     loop {
         tokio::select! {
             msg = chat.receive() => {
-                print_chat_message(msg);
+                print_chat_message(msg, &style_config);
             }
             Some(msg) = user_input_rx.recv() => {
                 let _ = chat.send(msg).await;
             }
             Some(cmd) = command_rx.recv() => {
-                let exit = handle_command(cmd, &mut chat).await;
+                let exit = handle_command(cmd, &mut chat, &mut style_config).await;
                 if exit {
                     break;
                 }
@@ -37,7 +39,11 @@ async fn main() {
     std::process::exit(0);
 }
 
-async fn handle_command(cmd: CommandMessage, chat: &mut Chat) -> bool {
+async fn handle_command(
+    cmd: CommandMessage,
+    chat: &mut Chat,
+    style_config: &mut StyleConfig,
+) -> bool {
     match cmd {
         (CommandType::FetchAuth, _) => {
             chat.fetch_auth_token().await;
@@ -59,6 +65,8 @@ async fn handle_command(cmd: CommandMessage, chat: &mut Chat) -> bool {
         }
         (CommandType::Clear, _) => clear(),
         (CommandType::Help, _) => print_help(),
+        (CommandType::Color, _) => style_config.color = !style_config.color,
+        (CommandType::Pad, _) => style_config.pad = !style_config.pad,
     };
     false
 }
