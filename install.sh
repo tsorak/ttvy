@@ -1,1 +1,1 @@
-ln -s $PWD/target/release/ttvy /usr/local/bin/ttvy
+ln -sf $PWD/target/release/ttvy ~/bin/ttvy

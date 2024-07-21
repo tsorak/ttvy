@@ -6,10 +6,22 @@ use input::{CommandMessage, CommandType, Input};
 mod output;
 use output::{print_chat_message, StyleConfig};
 
+mod cli_args;
+
 #[tokio::main]
 async fn main() {
+    let cli = cli_args::extract();
+
     let mut chat = Chat::new();
     chat.init().await;
+
+    if cli.authenticate {
+        chat.fetch_auth_token().await;
+    }
+
+    if let Some(ch) = cli.initial_channel {
+        chat.join(&ch);
+    }
 
     let mut input = Input::new();
     let (_handle, mut user_input_rx, mut command_rx) = input.init();
