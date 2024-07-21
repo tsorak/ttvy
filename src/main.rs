@@ -38,9 +38,9 @@ async fn main() {
                 let _ = chat.send(msg).await;
             }
             Some(cmd) = command_rx.recv() => {
-                let exit = handle_command(cmd, &mut chat, &mut style_config).await;
-                if exit {
-                    break;
+                match handle_command(cmd, &mut chat, &mut style_config).await {
+                    CommandLoopEvent::Exit => break,
+                    CommandLoopEvent::Continue => continue,
                 }
             }
         }
@@ -51,11 +51,16 @@ async fn main() {
     std::process::exit(0);
 }
 
+enum CommandLoopEvent {
+    Continue,
+    Exit,
+}
+
 async fn handle_command(
     cmd: CommandMessage,
     chat: &mut Chat,
     style_config: &mut StyleConfig,
-) -> bool {
+) -> CommandLoopEvent {
     match cmd {
         (CommandType::FetchAuth, _) => {
             chat.fetch_auth_token().await;
@@ -71,7 +76,7 @@ async fn handle_command(
         (CommandType::Save, _) => chat.config.save().await,
         (CommandType::ShowConfig, _) => println!("{:#?}", chat.config),
         (CommandType::Reconnect, _) => chat.reconnect(),
-        (CommandType::Exit, _) => return true,
+        (CommandType::Exit, _) => return CommandLoopEvent::Exit,
         (CommandType::Echo, s) => {
             dbg!(s);
         }
@@ -80,7 +85,7 @@ async fn handle_command(
         (CommandType::Color, _) => style_config.color = !style_config.color,
         (CommandType::Pad, _) => style_config.pad = !style_config.pad,
     };
-    false
+    CommandLoopEvent::Continue
 }
 
 fn clear() {
