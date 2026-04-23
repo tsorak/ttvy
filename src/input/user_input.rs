@@ -1,9 +1,11 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinHandle,
 };
+
+const ANTI_SPAM_COOLDOWN: Duration = Duration::from_millis(1000);
 
 const UP_ARROW: &str = "\u{1b}[A";
 
@@ -37,7 +39,7 @@ impl UserInput {
 
         let handle = tokio::spawn(async move {
             let mut last_message = String::new();
-            let mut timeout = anti_spam_timeout(0);
+            let mut ready_at = Instant::now();
 
             loop {
                 let msg = if let Some(msg) = rx.recv().await {
@@ -48,9 +50,9 @@ impl UserInput {
                 };
 
                 match msg {
-                    msg if timeout.is_finished() => {
+                    msg if Instant::now() >= ready_at => {
                         let _ = tx.send(msg.if_empty_do(&mut last_message)).await;
-                        timeout = anti_spam_timeout(1000);
+                        ready_at = Instant::now() + ANTI_SPAM_COOLDOWN;
                     }
                     msg if !msg.is_empty() => {
                         //Incoming message before timeout has passed.
@@ -67,12 +69,6 @@ impl UserInput {
 
         Some(handle)
     }
-}
-
-fn anti_spam_timeout(ms: u64) -> JoinHandle<()> {
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(ms)).await;
-    })
 }
 
 trait IfEmptyDo {
