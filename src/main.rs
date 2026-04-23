@@ -4,7 +4,7 @@ mod input;
 use input::CommandMessage;
 
 mod output;
-use output::{print_chat_message, StyleConfig};
+use output::StyleConfig;
 
 mod cli_args;
 
@@ -31,7 +31,7 @@ async fn main() {
     loop {
         tokio::select! {
             msg = chat.receive() => {
-                print_chat_message(msg, &style_config);
+                style_config.display(&msg);
             }
             Some(msg) = user_input_rx.recv() => {
                 let _ = chat.send(msg).await;

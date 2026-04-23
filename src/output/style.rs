@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use colored::{ColoredString, Colorize, CustomColor};
-use hex_color::HexColor::{self};
+use hex_color::HexColor;
+use ttvy_core::chat::ChatMessage;
 
 pub struct StyleConfig {
     pub color: bool,
@@ -24,32 +25,24 @@ impl StyleConfig {
         Self::default()
     }
 
-    pub fn style_author(&self, author: &str, color: Option<&str>) -> ColoredString {
-        if self.color {
-            color_author(author, color)
-        } else {
-            author.bold()
-        }
+    pub fn display(&self, msg: &ChatMessage) {
+        let author = self.style_author(&msg.author, msg.color.as_deref());
+        let leading_newline = if self.pad { "\n" } else { "" };
+        println!("{leading_newline}{author}: {}", msg.message);
     }
 
-    pub fn print_chat_message(&self, author: &ColoredString, message: &str) {
-        if self.pad {
-            println!("\n{}: {}", author, message);
-        } else {
-            println!("{}: {}", author, message);
+    fn style_author(&self, author: &str, color: Option<&str>) -> ColoredString {
+        if !self.color {
+            return author.bold();
         }
-    }
-}
 
-fn color_author(author: &str, color: Option<&str>) -> ColoredString {
-    if let Some(hexcolor) = color {
+        let Some(hexcolor) = color else {
+            return author.bold();
+        };
+
         match HexColor::from_str(hexcolor) {
-            Ok(hex_color::HexColor { r, g, b, .. }) => {
-                author.custom_color(CustomColor { r, g, b }).bold()
-            }
+            Ok(HexColor { r, g, b, .. }) => author.custom_color(CustomColor { r, g, b }).bold(),
             Err(_) => author.bold(),
         }
-    } else {
-        author.bold()
     }
 }
