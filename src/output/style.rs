@@ -24,11 +24,6 @@ impl StyleConfig {
         Self::default()
     }
 
-    // pub async fn update_inner(config: &Arc<Mutex<Self>>, accessor: Box<dyn FnOnce(&mut Self)>) {
-    //     let config = config.clone();
-    //     let lock = config.lock().await;
-    // }
-
     pub fn style_author(&self, author: &str, color: Option<&str>) -> ColoredString {
         if self.color {
             color_author(author, color)
