@@ -7,7 +7,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-pub use self::command::{CommandMessage, CommandType};
+pub use self::command::CommandMessage;
 use self::{command::Command, user_input::UserInput};
 
 pub struct Input {

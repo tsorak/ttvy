@@ -1,7 +1,7 @@
 use ttvy_core::chat::Chat;
 
 mod input;
-use input::{CommandMessage, CommandType, Input};
+use input::{CommandMessage, Input};
 
 mod output;
 use output::{print_chat_message, StyleConfig};
@@ -62,28 +62,28 @@ async fn handle_command(
     style_config: &mut StyleConfig,
 ) -> CommandLoopEvent {
     match cmd {
-        (CommandType::FetchAuth, _) => {
+        CommandMessage::FetchAuth => {
             chat.fetch_auth_token().await;
         }
-        (CommandType::SetAuth, token) => {
+        CommandMessage::SetAuth(token) => {
             chat.config.oauth.replace(token);
         }
-        (CommandType::SetNick, nick) => {
+        CommandMessage::SetNick(nick) => {
             chat.config.nick.replace(nick);
         }
-        (CommandType::Join, channel) => chat.join(&channel),
-        (CommandType::Leave, _) => chat.leave().await,
-        (CommandType::Save, _) => chat.config.save().await,
-        (CommandType::ShowConfig, _) => println!("{:#?}", chat.config),
-        (CommandType::Reconnect, _) => chat.reconnect(),
-        (CommandType::Exit, _) => return CommandLoopEvent::Exit,
-        (CommandType::Echo, s) => {
+        CommandMessage::Join(channel) => chat.join(&channel),
+        CommandMessage::Leave => chat.leave().await,
+        CommandMessage::Save => chat.config.save().await,
+        CommandMessage::ShowConfig => println!("{:#?}", chat.config),
+        CommandMessage::Reconnect => chat.reconnect(),
+        CommandMessage::Exit => return CommandLoopEvent::Exit,
+        CommandMessage::Echo(s) => {
             dbg!(s);
         }
-        (CommandType::Clear, _) => clear(),
-        (CommandType::Help, _) => print_help(),
-        (CommandType::Color, _) => style_config.color = !style_config.color,
-        (CommandType::Pad, _) => style_config.pad = !style_config.pad,
+        CommandMessage::Clear => clear(),
+        CommandMessage::Help => print_help(),
+        CommandMessage::Color => style_config.color = !style_config.color,
+        CommandMessage::Pad => style_config.pad = !style_config.pad,
     };
     CommandLoopEvent::Continue
 }
