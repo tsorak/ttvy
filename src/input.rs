@@ -17,12 +17,9 @@ pub struct Input {
 
 impl Input {
     pub fn new() -> Self {
-        let mut user_input = UserInput::new(10);
-        user_input.init();
-
         Self {
             command: Command::new(),
-            user_input,
+            user_input: UserInput::new(10),
         }
     }
 
