@@ -51,7 +51,7 @@ impl UserInput {
 
                 match msg {
                     msg if Instant::now() >= ready_at => {
-                        let _ = tx.send(msg.if_empty_do(&mut last_message)).await;
+                        let _ = tx.send(take_or_last(msg, &mut last_message)).await;
                         ready_at = Instant::now() + ANTI_SPAM_COOLDOWN;
                     }
                     msg if !msg.is_empty() => {
@@ -71,28 +71,18 @@ impl UserInput {
     }
 }
 
-trait IfEmptyDo {
-    fn if_empty_do(&self, fallback: &mut String) -> String;
-}
-
-impl IfEmptyDo for String {
-    fn if_empty_do(&self, fallback: &mut String) -> String {
-        if self.is_empty() {
-            fallback.clone()
-        } else {
-            *fallback = self.clone();
-            self.clone()
-        }
+fn take_or_last(msg: String, last: &mut String) -> String {
+    if msg.is_empty() {
+        last.clone()
+    } else {
+        last.clone_from(&msg);
+        msg
     }
 }
 
-fn prepend_last_message(s: String, last_msg: &String) -> String {
-    if !s.starts_with(UP_ARROW) {
-        return s;
-    }
-
-    match s.splitn(2, UP_ARROW).collect::<Vec<_>>()[..] {
-        ["", addition] => format!("{last_msg} {addition}"),
-        _ => s,
+fn prepend_last_message(s: String, last_msg: &str) -> String {
+    match s.strip_prefix(UP_ARROW) {
+        Some(addition) => format!("{last_msg} {addition}"),
+        None => s,
     }
 }
