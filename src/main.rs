@@ -92,26 +92,29 @@ fn clear() {
     println!("\x1B[2J\x1B[1;1H");
 }
 
+const HELP_TEXT: &str = "\
+[MAIN]
+!join(j) [CHANNEL]: Join the specified Twitch chatroom
+!leave(d): Leave the current chatroom
+!auth: (Re)authenticate with twitch (required in order to send messages)
+!auth [TOKEN]: manually set auth token
+!nick [NAME]: Set nickname (This needs to be the name of the channel you authenticated as)
+!reconnect(r): Reconnect to the last channel
+
+[CHAT SETTINGS]
+!color: Color usernames
+!pad: Print an empty newline between each message
+!debug: Print various junk that Twitch sends
+
+[MISC]
+!show config: Prints the current config
+!q: Quit the application
+!c: Clear the screen
+!help(h): Print this clump of text
+
+Editing NICK or AUTH when connected to a chatroom will not take effect, reconnect to apply.
+";
+
 fn print_help() {
-    println!(
-        "\
-        [MAIN]\n\
-        !join(j) [CHANNEL]: Join the specified Twitch chatroom\n\
-        !leave(d): Leave the current chatroom\n\
-        !auth: (Re)authenticate with twitch (required in order to send messages)\n\
-        !auth [TOKEN]: manually set auth token\n\
-        !nick [NAME]: Set nickname (This needs to be the name of the channel you authenticated as)\n\
-        !reconnect(r): Reconnect to the last channel\n\n\
-        [CHAT SETTINGS]\n\
-        !color: Color usernames\n\
-        !pad: Print an empty newline between each message\n\
-        !debug: Print various junk that Twitch sends\n\n\
-        [MISC]\n\
-        !show config: Prints the current config\n\
-        !q: Quit the application\n\
-        !c: Clear the screen\n\
-        !help(h): Print this clump of text\n\n\
-        Editing NICK or AUTH when connected to a chatroom will not take effect, reconnect to apply.
-        "
-    );
+    println!("{HELP_TEXT}");
 }
