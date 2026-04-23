@@ -1,5 +1,3 @@
-use tokio::sync::mpsc::{channel, Receiver, Sender};
-
 #[derive(Debug)]
 pub enum CommandMessage {
     FetchAuth,
@@ -19,18 +17,8 @@ pub enum CommandMessage {
 }
 use self::CommandMessage as C;
 
-pub struct Command {
-    pub(super) tx: Sender<CommandMessage>,
-    pub(super) rx: Option<Receiver<CommandMessage>>,
-}
-
-impl Command {
-    pub fn new() -> Self {
-        let (tx, rx) = channel::<CommandMessage>(10);
-        Self { tx, rx: Some(rx) }
-    }
-
-    pub fn parse(line: &str) -> Option<CommandMessage> {
+impl CommandMessage {
+    pub fn parse(line: &str) -> Option<Self> {
         let (cmd, arg) = match line.split_once(' ') {
             None => (line, None),
             Some(("echo", s)) => ("echo", Some(s.to_string())),

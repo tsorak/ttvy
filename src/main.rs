@@ -1,7 +1,7 @@
 use ttvy_core::chat::Chat;
 
 mod input;
-use input::{CommandMessage, Input};
+use input::CommandMessage;
 
 mod output;
 use output::{print_chat_message, StyleConfig};
@@ -23,8 +23,7 @@ async fn main() {
         chat.join(&ch);
     }
 
-    let mut input = Input::new();
-    let (_handle, mut user_input_rx, mut command_rx) = input.init();
+    let (_handle, mut user_input_rx, mut command_rx) = input::start();
 
     let mut style_config = StyleConfig::new();
 
