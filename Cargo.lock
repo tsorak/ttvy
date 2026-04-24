@@ -1128,7 +1128,7 @@ dependencies = [
 [[package]]
 name = "ttvy_core"
 version = "0.1.0"
-source = "git+https://github.com/tsorak/ttvy_core.git#4969f4d198b2e463516bcc248de757f98fe3496b"
+source = "git+https://github.com/tsorak/ttvy_core.git#d76f479e5d8003a470ca65e40fc93a3fa7cca253"
 dependencies = [
  "axum",
  "fast_websocket_client",
