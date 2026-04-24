@@ -1,4 +1,10 @@
-use ttvy_core::chat::Chat;
+use std::io;
+
+use crossterm::event::EventStream;
+use futures::StreamExt;
+use ratatui::text::Line;
+use tokio::sync::mpsc::Sender;
+use ttvy_core::chat::{Chat, ChatEvent, ChatMessage};
 
 mod input;
 use input::CommandMessage;
@@ -8,8 +14,11 @@ use output::StyleConfig;
 
 mod cli_args;
 
+mod ui;
+use ui::{AppEvent, AppState, Tui};
+
 #[tokio::main]
-async fn main() {
+async fn main() -> io::Result<()> {
     let cli = cli_args::extract();
 
     let mut chat = Chat::new();
@@ -23,31 +32,60 @@ async fn main() {
         chat.join(&ch);
     }
 
-    let (_handle, mut user_input_rx, mut command_rx) = input::start();
-
+    let (user_input_tx, mut user_input_rx) = input::user_channel(10);
     let mut style_config = StyleConfig::new();
+    let mut state = AppState::new();
 
-    println!("Type !help for help");
+    state.push_line(StyleConfig::system("Type !help for help"));
+
+    ui::install_panic_hook();
+    let mut tui = Tui::enter()?;
+    let mut events = EventStream::new();
+
     loop {
+        tui.terminal.draw(|f| ui::draw(f, &state))?;
+
         tokio::select! {
-            msg = chat.receive() => {
-                style_config.display(&msg);
+            event = chat.receive() => {
+                push_event(&mut state, &style_config, event);
+            }
+            Some(Ok(event)) = events.next() => {
+                match ui::handle_event(event, &mut state) {
+                    Some(AppEvent::Submit(line)) => {
+                        if matches!(
+                            route_input(line, &user_input_tx, &mut chat, &mut style_config, &mut state).await,
+                            CommandLoopEvent::Exit
+                        ) {
+                            break;
+                        }
+                    }
+                    Some(AppEvent::Quit) => break,
+                    None => {}
+                }
             }
             Some(msg) = user_input_rx.recv() => {
                 let _ = chat.send(msg).await;
             }
-            Some(cmd) = command_rx.recv() => {
-                match handle_command(cmd, &mut chat, &mut style_config).await {
-                    CommandLoopEvent::Exit => break,
-                    CommandLoopEvent::Continue => continue,
-                }
-            }
         }
     }
 
+    drop(tui);
     println!("Goodbye");
-    //stdin receiver freezes, todo!
-    std::process::exit(0);
+    Ok(())
+}
+
+fn push_event(state: &mut AppState, style: &StyleConfig, event: ChatEvent) {
+    match event {
+        ChatEvent::Message(msg) => push_chat(state, style, &msg),
+        ChatEvent::System(s) => state.push_line(StyleConfig::system(s)),
+    }
+}
+
+fn push_chat(state: &mut AppState, style: &StyleConfig, msg: &ChatMessage) {
+    if style.pad {
+        state.push_line(Line::from(""));
+    }
+    state.push_line(style.display(msg));
 }
 
 enum CommandLoopEvent {
@@ -55,10 +93,30 @@ enum CommandLoopEvent {
     Exit,
 }
 
+async fn route_input(
+    line: String,
+    user_input_tx: &Sender<String>,
+    chat: &mut Chat,
+    style_config: &mut StyleConfig,
+    state: &mut AppState,
+) -> CommandLoopEvent {
+    if let Some(rest) = line.strip_prefix('!') {
+        if let Some(cmd) = CommandMessage::parse(rest) {
+            return handle_command(cmd, chat, style_config, state).await;
+        }
+        state.push_line(StyleConfig::system(format!("Unknown command: !{rest}")));
+        return CommandLoopEvent::Continue;
+    }
+
+    let _ = user_input_tx.send(line).await;
+    CommandLoopEvent::Continue
+}
+
 async fn handle_command(
     cmd: CommandMessage,
     chat: &mut Chat,
     style_config: &mut StyleConfig,
+    state: &mut AppState,
 ) -> CommandLoopEvent {
     match cmd {
         CommandMessage::FetchAuth => {
@@ -72,23 +130,27 @@ async fn handle_command(
         }
         CommandMessage::Join(channel) => chat.join(&channel),
         CommandMessage::Leave => chat.leave().await,
-        CommandMessage::Save => chat.config.save().await,
-        CommandMessage::ShowConfig => println!("{:#?}", chat.config),
-        CommandMessage::Reconnect => chat.reconnect(),
+        CommandMessage::Save => chat.save().await,
+        CommandMessage::ShowConfig => {
+            for line in format!("{:#?}", chat.config).lines() {
+                state.push_line(StyleConfig::system(line.to_string()));
+            }
+        }
+        CommandMessage::Reconnect => chat.reconnect().await,
         CommandMessage::Exit => return CommandLoopEvent::Exit,
         CommandMessage::Echo(s) => {
-            dbg!(s);
+            state.push_line(StyleConfig::system(format!("echo: {s}")));
         }
-        CommandMessage::Clear => clear(),
-        CommandMessage::Help => print_help(),
+        CommandMessage::Clear => state.clear_messages(),
+        CommandMessage::Help => {
+            for line in HELP_TEXT.lines() {
+                state.push_line(StyleConfig::system(line.to_string()));
+            }
+        }
         CommandMessage::Color => style_config.color = !style_config.color,
         CommandMessage::Pad => style_config.pad = !style_config.pad,
     };
     CommandLoopEvent::Continue
-}
-
-fn clear() {
-    println!("\x1B[2J\x1B[1;1H");
 }
 
 const HELP_TEXT: &str = "\
@@ -113,7 +175,3 @@ const HELP_TEXT: &str = "\
 
 Editing NICK or AUTH when connected to a chatroom will not take effect, reconnect to apply.
 ";
-
-fn print_help() {
-    println!("{HELP_TEXT}");
-}

@@ -7,7 +7,12 @@ use clap::{
 };
 
 #[derive(Parser)]
-#[command(name = "ttvy", about = "Command-line Twitch chat client", author, version)]
+#[command(
+    name = "ttvy",
+    about = "Command-line Twitch chat client",
+    author,
+    version
+)]
 pub struct CliArgs {
     #[arg(help = "Provide a channel to connect to initially")]
     pub initial_channel: Option<String>,
