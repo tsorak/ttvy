@@ -77,7 +77,17 @@ async fn main() -> io::Result<()> {
 fn push_event(state: &mut AppState, style: &StyleConfig, event: ChatEvent) {
     match event {
         ChatEvent::Message(msg) => push_chat(state, style, &msg),
-        ChatEvent::System(s) => state.push_line(StyleConfig::system(s)),
+        ChatEvent::System(s) => push_system(state, &s),
+    }
+}
+
+fn push_system(state: &mut AppState, text: &str) {
+    for line in text.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.is_empty() {
+            continue;
+        }
+        state.push_line(StyleConfig::system(line.to_string()));
     }
 }
 
